@@ -473,25 +473,25 @@ export function Dashboard() {
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* 大型系统刷新确认对话框 */}
       {showRefreshConfirm && refreshEstimate?.show_estimate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-background border rounded-lg shadow-lg p-6 max-w-md mx-4 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-md animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center shrink-0">
                 <Database className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
               </div>
-              <div>
-                <h3 className="font-semibold">确认刷新数据</h3>
-                <p className="text-sm text-muted-foreground">{refreshEstimate.scale === 'large' ? '大型系统' : '超大型系统'}</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-base sm:text-lg">确认刷新数据</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">{refreshEstimate.scale === 'large' ? '大型系统' : '超大型系统'}</p>
               </div>
             </div>
 
             <div className="space-y-3 mb-6">
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">预计扫描日志</span>
-                  <span className="font-medium">{refreshEstimate.estimated_logs_formatted} 条</span>
+              <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex justify-between text-xs sm:text-sm">
+                  <span className="text-muted-foreground">预计扫描</span>
+                  <span className="font-medium">{refreshEstimate.estimated_logs_formatted}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs sm:text-sm">
                   <span className="text-muted-foreground">预计耗时</span>
                   <span className="font-medium">{refreshEstimate.estimated_time_formatted}</span>
                 </div>
@@ -499,25 +499,25 @@ export function Dashboard() {
 
               {refreshEstimate.warning && (
                 <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                  <Activity className="h-3 w-3" />
-                  {refreshEstimate.warning}
+                  <Activity className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{refreshEstimate.warning}</span>
                 </p>
               )}
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 text-sm"
                 onClick={handleCancelRefresh}
               >
                 取消
               </Button>
               <Button
-                className="flex-1"
+                className="flex-1 text-sm"
                 onClick={handleRefresh}
               >
-                确认刷新
+                确认
               </Button>
             </div>
           </div>
@@ -526,17 +526,17 @@ export function Dashboard() {
 
       {/* 大型系统刷新进度覆盖层 */}
       {refreshing && refreshProgress && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-background border rounded-lg shadow-lg p-8 max-w-sm mx-4 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border rounded-lg shadow-lg p-6 sm:p-8 w-full max-w-sm animate-in zoom-in-95 duration-200">
             <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <div className="text-center">
-                <p className="font-medium">{refreshProgress}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  正在查询 {refreshEstimate?.estimated_logs_formatted || '大量'} 条日志数据
+              <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-primary" />
+              <div className="text-center w-full">
+                <p className="font-medium text-sm sm:text-base">{refreshProgress}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+                  正在查询 {refreshEstimate?.estimated_logs_formatted || '大量'} 条日志
                 </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  预计需要 {refreshEstimate?.estimated_time_formatted || '较长时间'}，请耐心等待
+                <p className="text-xs text-muted-foreground mt-1">
+                  预计 {refreshEstimate?.estimated_time_formatted || '较长时间'}
                 </p>
               </div>
             </div>
@@ -545,40 +545,49 @@ export function Dashboard() {
       )}
 
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:gap-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">仪表盘</h2>
-          <p className="text-muted-foreground mt-1">系统运行状态与实时数据概览</p>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">仪表盘</h2>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">系统运行状态与实时数据概览</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* 刷新按钮和自动刷新控制 */}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="h-9">
-              <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
-              {refreshing ? '刷新中...' : '刷新'}
+
+        {/* 移动端：竖向排列；桌面端：横向排列 */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+          {/* 刷新按钮和自动刷新控制 - 移动端全宽 */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="h-9 flex-1 sm:flex-none min-w-[80px]"
+            >
+              <RefreshCw className={cn("h-4 w-4 sm:mr-2", refreshing && "animate-spin")} />
+              <span className="hidden sm:inline">{refreshing ? '刷新中...' : '刷新'}</span>
+              <span className="sm:hidden">{refreshing ? '中' : '刷新'}</span>
             </Button>
-            
+
             {/* 自动刷新下拉菜单 */}
-            <div className="relative" ref={dropdownRef}>
-              <Button 
-                variant="outline" 
-                size="sm" 
+            <div className="relative flex-1 sm:flex-none" ref={dropdownRef}>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowIntervalDropdown(!showIntervalDropdown)}
-                className="h-9 min-w-[100px]"
+                className="h-9 w-full sm:w-auto sm:min-w-[100px] justify-between"
               >
-                <Timer className="h-4 w-4 mr-2" />
-                {refreshInterval > 0 ? (
-                  <span className="flex items-center gap-1">
-                    <span className="text-primary font-medium">{formatCountdown(countdown)}</span>
-                  </span>
-                ) : (
-                  '自动刷新'
-                )}
-                <ChevronDown className="h-3 w-3 ml-1" />
+                <div className="flex items-center gap-2">
+                  <Timer className="h-4 w-4" />
+                  {refreshInterval > 0 ? (
+                    <span className="text-primary font-medium text-sm">{formatCountdown(countdown)}</span>
+                  ) : (
+                    <span className="text-sm">自动</span>
+                  )}
+                </div>
+                <ChevronDown className="h-3 w-3" />
               </Button>
-              
+
               {showIntervalDropdown && (
-                <div className="absolute right-0 mt-1 w-48 bg-popover border rounded-md shadow-lg z-50">
+                <div className="absolute right-0 sm:right-auto sm:left-0 mt-1 w-full sm:w-48 bg-popover border rounded-md shadow-lg z-50">
                   <div className="p-2 border-b">
                     <p className="text-xs text-muted-foreground">刷新间隔</p>
                   </div>
@@ -599,7 +608,7 @@ export function Dashboard() {
                   {lastRefreshTime && (
                     <div className="p-2 border-t">
                       <p className="text-xs text-muted-foreground">
-                        上次刷新: {formatLastRefreshTime(lastRefreshTime)}
+                        上次: {formatLastRefreshTime(lastRefreshTime)}
                       </p>
                     </div>
                   )}
@@ -608,17 +617,17 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* 时间范围选择 */}
-          <div className="inline-flex rounded-lg border bg-muted/50 p-1">
+          {/* 时间范围选择 - 移动端全宽，小尺寸 */}
+          <div className="inline-flex rounded-lg border bg-muted/50 p-1 w-full sm:w-auto overflow-x-auto">
             {(['24h', '3d', '7d', '14d'] as PeriodType[]).map((p) => (
-              <Button 
-                key={p} 
-                variant={period === p ? 'default' : 'ghost'} 
-                size="sm" 
+              <Button
+                key={p}
+                variant={period === p ? 'default' : 'ghost'}
+                size="sm"
                 onClick={() => setPeriod(p)}
-                className="h-7 text-xs px-3"
+                className="h-7 text-xs px-2 sm:px-3 flex-1 sm:flex-none whitespace-nowrap"
               >
-                {p === '24h' ? '24小时' : p === '3d' ? '3天' : p === '7d' ? '7天' : '14天'}
+                {p === '24h' ? '24h' : p === '3d' ? '3天' : p === '7d' ? '7天' : '14天'}
               </Button>
             ))}
           </div>

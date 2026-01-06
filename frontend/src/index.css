@@ -61,6 +61,31 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* 移动端触摸优化 */
+  @media (max-width: 640px) {
+    /* 增大可点击区域 */
+    button, a, [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* 优化输入框 */
+    input, select, textarea {
+      min-height: 44px;
+      font-size: 16px; /* 防止 iOS 自动缩放 */
+    }
+
+    /* 优化滚动性能 */
+    * {
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 防止双击缩放 */
+    * {
+      touch-action: manipulation;
+    }
+  }
 }
 
 @layer utilities {
@@ -71,7 +96,7 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;

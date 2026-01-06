@@ -130,10 +130,13 @@ export function Layout({ children, activeTab, onTabChange, onLogout }: LayoutPro
         {/* Modern Navigation Tabs */}
         <div className="w-full border-t border-border/40">
           <div className="max-w-7xl mx-auto">
-            <nav className="relative flex items-center w-full overflow-x-auto no-scrollbar px-4 sm:px-6 lg:px-8 h-14" aria-label="Tabs">
+            <nav
+              className="relative flex items-center w-full overflow-x-auto overflow-y-hidden no-scrollbar px-2 sm:px-6 lg:px-8 h-14 -mx-2 sm:mx-0 scroll-smooth"
+              aria-label="Tabs"
+            >
               {/* Sliding Background Indicator */}
               <div
-                className="absolute inset-y-2.5 bg-secondary rounded-md transition-all duration-300 ease-out"
+                className="absolute inset-y-2.5 sm:inset-y-2.5 bg-secondary rounded-md transition-all duration-300 ease-out pointer-events-none"
                 style={{
                   left: indicatorStyle.left,
                   width: indicatorStyle.width,
@@ -147,7 +150,7 @@ export function Layout({ children, activeTab, onTabChange, onLogout }: LayoutPro
                   ref={el => tabsRef.current[index] = el}
                   onClick={() => onTabChange(id)}
                   className={cn(
-                    "relative h-9 flex items-center justify-center gap-2 px-3 sm:px-4 text-sm font-medium rounded-md whitespace-nowrap transition-colors duration-200 z-10 select-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                    "relative h-9 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 lg:px-4 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors duration-200 z-10 select-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 shrink-0",
                     activeTab === id
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground/80"
