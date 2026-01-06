@@ -25,7 +25,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository | lowercase }}
+  IMAGE_NAME: r-llm/new_api_tools
 
 jobs:
   build:
