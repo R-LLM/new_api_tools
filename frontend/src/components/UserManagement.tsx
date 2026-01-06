@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Globe,
   Activity,
+  Info,
+  Network,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
@@ -42,6 +44,49 @@ import {
 import { Progress } from './ui/progress'
 import { StatCard } from './StatCard'
 import { cn } from '../lib/utils'
+
+// IP信息查询相关类型
+interface IPInfo {
+  ip: {
+    address: string
+    cfConnectingIP: string
+    xForwardedFor: string | null
+    xRealIP: string
+  }
+  location: {
+    colo: string
+    country: string
+    city: string
+    continent: string
+    latitude: string
+    longitude: string
+    postalCode: string
+    region: string
+    regionCode: string
+    timezone: string
+    isEUCountry: boolean
+  }
+  network: {
+    asn: number
+    asOrganization: string
+  }
+  protocol: {
+    httpProtocol: string
+    tlsVersion: string
+    tlsCipher: string
+  }
+}
+
+interface IPGroup {
+  location: string
+  organization: string
+  ips: Array<{
+    address: string
+    requestCount: number
+    info: IPInfo | null
+  }>
+  totalRequests: number
+}
 
 // IP切换分析类型
 interface IPSwitchDetail {
@@ -178,6 +223,17 @@ export function UserManagement() {
   const [analysisWindow, setAnalysisWindow] = useState<string>('24h')
   const [analysis, setAnalysis] = useState<UserAnalysis | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
+
+  // IP信息查询弹窗状态
+  const [ipInfoDialogOpen, setIpInfoDialogOpen] = useState(false)
+  const [selectedIP, setSelectedIP] = useState<string>('')
+  const [ipInfo, setIpInfo] = useState<IPInfo | null>(null)
+  const [ipInfoLoading, setIpInfoLoading] = useState(false)
+
+  // 批量IP查询状态
+  const [batchIPDialogOpen, setBatchIPDialogOpen] = useState(false)
+  const [batchIPLoading, setBatchIPLoading] = useState(false)
+  const [ipGroups, setIpGroups] = useState<IPGroup[]>([])
 
   // 邀请用户列表状态
   const [invitedUsers, setInvitedUsers] = useState<{
@@ -458,6 +514,104 @@ export function UserManagement() {
       fetchInvitedUsers()
     }
   }, [analysisDialogOpen, selectedUser, invitedPage, fetchInvitedUsers])
+
+  // 查询单个IP信息
+  const fetchIPInfo = useCallback(async (ip: string) => {
+    setSelectedIP(ip)
+    setIpInfoDialogOpen(true)
+    setIpInfo(null)
+    setIpInfoLoading(true)
+    try {
+      const response = await fetch(`https://ip.zxiaoruan.cn/api?ip=${ip}`)
+      const data = await response.json()
+      if (data && data.ip) {
+        setIpInfo(data)
+      } else {
+        showToast('error', '查询IP信息失败')
+      }
+    } catch (error) {
+      console.error('Failed to fetch IP info:', error)
+      showToast('error', '查询IP信息失败')
+    } finally {
+      setIpInfoLoading(false)
+    }
+  }, [showToast])
+
+  // 批量查询用户所有IP信息
+  const fetchBatchIPInfo = useCallback(async () => {
+    if (!analysis) return
+    setBatchIPDialogOpen(true)
+    setBatchIPLoading(true)
+    setIpGroups([])
+
+    try {
+      // 获取所有IP及其请求次数
+      const allIPs = analysis.top_ips
+      const results: Array<{ address: string; requestCount: number; info: IPInfo | null }> = []
+
+      // 并发查询所有IP（限制并发数为5）
+      const batchSize = 5
+      for (let i = 0; i < allIPs.length; i += batchSize) {
+        const batch = allIPs.slice(i, i + batchSize)
+        const batchResults = await Promise.allSettled(
+          batch.map(async (ipData) => {
+            try {
+              const response = await fetch(`https://ip.zxiaoruan.cn/api?ip=${ipData.ip}`)
+              const data = await response.json()
+              return {
+                address: ipData.ip,
+                requestCount: ipData.requests,
+                info: data && data.ip ? data : null,
+              }
+            } catch (error) {
+              console.error(`Failed to fetch IP info for ${ipData.ip}:`, error)
+              return {
+                address: ipData.ip,
+                requestCount: ipData.requests,
+                info: null,
+              }
+            }
+          })
+        )
+
+        batchResults.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            results.push(result.value)
+          }
+        })
+      }
+
+      // 按归属地+服务商分组
+      const groupMap = new Map<string, IPGroup>()
+      results.forEach((result) => {
+        const location = result.info?.location?.city || result.info?.location?.country || '未知地区'
+        const organization = result.info?.network?.asOrganization || '未知服务商'
+        const key = `${location} - ${organization}`
+
+        if (!groupMap.has(key)) {
+          groupMap.set(key, {
+            location,
+            organization,
+            ips: [],
+            totalRequests: 0,
+          })
+        }
+
+        const group = groupMap.get(key)!
+        group.ips.push(result)
+        group.totalRequests += result.requestCount
+      })
+
+      // 按总请求量排序
+      const sortedGroups = Array.from(groupMap.values()).sort((a, b) => b.totalRequests - a.totalRequests)
+      setIpGroups(sortedGroups)
+    } catch (error) {
+      console.error('Failed to fetch batch IP info:', error)
+      showToast('error', '批量查询IP信息失败')
+    } finally {
+      setBatchIPLoading(false)
+    }
+  }, [analysis, showToast])
 
   const formatQuota = (quota: number) => `$${(quota / 500000).toFixed(2)}`
 
@@ -957,17 +1111,35 @@ export function UserManagement() {
                   </div>
 
                   <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                      <Globe className="w-4 h-4" />
-                      来源 IP (Top 5)
-                    </h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        来源 IP (Top 5)
+                      </h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                        onClick={fetchBatchIPInfo}
+                        disabled={analysis.top_ips.length === 0}
+                      >
+                        <Network className="w-3 h-3 mr-1" />
+                        查询全部IP
+                      </Button>
+                    </div>
                     {analysis.top_ips.slice(0, 5).length ? (
                       analysis.top_ips.slice(0, 5).map((ip) => {
                         const pct = analysis.summary.total_requests ? (ip.requests / analysis.summary.total_requests) * 100 : 0
                         return (
                           <div key={ip.ip} className="space-y-1.5">
                             <div className="flex justify-between text-xs">
-                              <span className="font-medium font-mono truncate">{ip.ip}</span>
+                              <span
+                                className="font-medium font-mono truncate cursor-pointer hover:text-primary hover:underline"
+                                onClick={() => fetchIPInfo(ip.ip)}
+                                title="点击查看IP详情"
+                              >
+                                {ip.ip}
+                              </span>
                               <span className="text-muted-foreground tabular-nums">{formatAnalysisNumber(ip.requests)} ({pct.toFixed(0)}%)</span>
                             </div>
                             <Progress value={pct} className="h-1.5" />
@@ -1163,7 +1335,15 @@ export function UserManagement() {
                             </TableCell>
                             <TableCell className="py-1.5 text-xs font-medium truncate max-w-[150px]" title={l.model_name}>{l.model_name}</TableCell>
                             <TableCell className="py-1.5 text-xs text-right text-muted-foreground tabular-nums">{l.use_time}ms</TableCell>
-                            <TableCell className="py-1.5 text-xs text-right text-muted-foreground font-mono">{l.ip}</TableCell>
+                            <TableCell className="py-1.5 text-xs text-right">
+                              <span
+                                className="text-muted-foreground font-mono cursor-pointer hover:text-primary hover:underline"
+                                onClick={() => fetchIPInfo(l.ip)}
+                                title="点击查看IP详情"
+                              >
+                                {l.ip}
+                              </span>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1297,6 +1477,199 @@ export function UserManagement() {
 
           <DialogFooter className="p-4 border-t bg-muted/10 flex-shrink-0">
             <Button variant="outline" onClick={() => setAnalysisDialogOpen(false)}>关闭</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* IP信息查询弹窗 */}
+      <Dialog open={ipInfoDialogOpen} onOpenChange={setIpInfoDialogOpen}>
+        <DialogContent className="max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" />
+              IP详细信息
+            </DialogTitle>
+            <DialogDescription>IP地址: {selectedIP}</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {ipInfoLoading ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                <p className="text-sm text-muted-foreground">正在查询IP信息...</p>
+              </div>
+            ) : ipInfo ? (
+              <div className="space-y-4">
+                {/* 基本信息 */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground">基本信息</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">IP地址</span>
+                      <p className="font-mono font-medium">{ipInfo.ip.address}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">ASN</span>
+                      <p className="font-medium">{ipInfo.network.asn}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 位置信息 */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground">位置信息</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">国家/地区</span>
+                      <p className="font-medium">{ipInfo.location.country}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">城市</span>
+                      <p className="font-medium">{ipInfo.location.city}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">地区</span>
+                      <p className="font-medium">{ipInfo.location.region}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">时区</span>
+                      <p className="font-medium">{ipInfo.location.timezone}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 网络信息 */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground">网络信息</h4>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">服务商</span>
+                    <p className="font-medium">{ipInfo.network.asOrganization}</p>
+                  </div>
+                </div>
+
+                {/* 协议信息 */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground">协议信息</h4>
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">HTTP</span>
+                      <p className="font-mono text-xs">{ipInfo.protocol.httpProtocol}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">TLS</span>
+                      <p className="font-mono text-xs">{ipInfo.protocol.tlsVersion}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">加密</span>
+                      <p className="font-mono text-xs truncate" title={ipInfo.protocol.tlsCipher}>{ipInfo.protocol.tlsCipher}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Info className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                <p>暂无IP信息</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIpInfoDialogOpen(false)}>关闭</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 批量IP信息查询弹窗 */}
+      <Dialog open={batchIPDialogOpen} onOpenChange={setBatchIPDialogOpen}>
+        <DialogContent className="max-w-4xl w-full max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-xl border-border/50 shadow-2xl">
+          <DialogHeader className="p-5 border-b bg-muted/10 flex-shrink-0">
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Network className="h-5 w-5 text-primary" />
+              用户全部IP分析
+            </DialogTitle>
+            <DialogDescription>
+              用户: <span className="font-mono text-foreground font-medium">{selectedUser?.username}</span> · 共 {analysis?.top_ips.length || 0} 个IP地址
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-5 min-h-0 bg-background">
+            {batchIPLoading ? (
+              <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
+                <Loader2 className="h-8 w-8 mb-4 animate-spin text-primary/50" />
+                <p>正在查询IP信息，请稍候...</p>
+                <p className="text-xs mt-2">可能需要一些时间，请耐心等待</p>
+              </div>
+            ) : ipGroups.length > 0 ? (
+              <div className="space-y-4">
+                {ipGroups.map((group, groupIdx) => (
+                  <Card key={groupIdx} className="overflow-hidden">
+                    <CardHeader className="pb-3 bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-primary" />
+                          {group.location}
+                          <Badge variant="outline" className="text-xs ml-2">{group.organization}</Badge>
+                        </CardTitle>
+                        <div className="text-sm text-muted-foreground">
+                          {group.ips.length} 个IP · {formatAnalysisNumber(group.totalRequests)} 次请求
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                      <div className="space-y-2">
+                        {group.ips.map((ipData, ipIdx) => (
+                          <div
+                            key={ipIdx}
+                            className="flex items-center justify-between p-2 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors group"
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <code className="font-mono text-sm font-medium text-foreground">{ipData.address}</code>
+                              {ipData.info ? (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{ipData.info.location.country}</span>
+                                  <span>·</span>
+                                  <span>{ipData.info.location.city}</span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">查询失败</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-primary tabular-nums">
+                                {formatAnalysisNumber(ipData.requestCount)} 次
+                              </span>
+                              {ipData.info && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => {
+                                    setBatchIPDialogOpen(false)
+                                    fetchIPInfo(ipData.address)
+                                  }}
+                                  title="查看详情"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                暂无IP分组数据
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-4 border-t bg-muted/10 flex-shrink-0">
+            <Button variant="outline" onClick={() => setBatchIPDialogOpen(false)}>关闭</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
